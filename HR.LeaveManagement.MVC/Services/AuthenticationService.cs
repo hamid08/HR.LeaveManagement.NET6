@@ -3,15 +3,8 @@ using HR.LeaveManagement.MVC.Models;
 using HR.LeaveManagement.MVC.Services.Base;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Http;
-using System;
-using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
-using System.Net.Http.Headers;
 using System.Security.Claims;
-using System.Threading.Tasks;
 
 namespace HR.LeaveManagement.MVC.Contracts
 {
@@ -21,7 +14,7 @@ namespace HR.LeaveManagement.MVC.Contracts
         private readonly IMapper _mapper;
         private JwtSecurityTokenHandler _tokenHandler;
 
-        public AuthenticationService(IClient client, ILocalStorageService localStorage, IHttpContextAccessor httpContextAccessor,
+        public AuthenticationService(IHRClient client, ILocalStorageService localStorage, IHttpContextAccessor httpContextAccessor,
             IMapper mapper)
             : base(client, localStorage)
         {
@@ -50,7 +43,7 @@ namespace HR.LeaveManagement.MVC.Contracts
                 }
                 return false;
             }
-            catch 
+            catch
             {
                 return false;
             }

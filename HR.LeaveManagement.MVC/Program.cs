@@ -23,7 +23,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddTransient<IAuthenticationService, AuthenticationService>();
 
-builder.Services.AddHttpClient<IClient, Client>(cl => cl.BaseAddress = new Uri("https://localhost:7273"));
+builder.Services.AddHttpClient<IHRClient, HRClient>(cl => cl.BaseAddress = new Uri("https://localhost:7273"));
 builder.Services.AddAutoMapper(Assembly.GetExecutingAssembly());
 
 builder.Services.AddScoped<ILeaveTypeService, LeaveTypeService>();

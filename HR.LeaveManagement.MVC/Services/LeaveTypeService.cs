@@ -2,10 +2,6 @@
 using HR.LeaveManagement.MVC.Contracts;
 using HR.LeaveManagement.MVC.Models;
 using HR.LeaveManagement.MVC.Services.Base;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace HR.LeaveManagement.MVC.Services
 {
@@ -13,13 +9,11 @@ namespace HR.LeaveManagement.MVC.Services
     {
         private readonly ILocalStorageService _localStorageService;
         private readonly IMapper _mapper;
-        private readonly IClient _httpclient;
 
-        public LeaveTypeService(IMapper mapper, IClient httpclient, ILocalStorageService localStorageService) : base(httpclient, localStorageService)
+        public LeaveTypeService(IMapper mapper, IHRClient httpclient, ILocalStorageService localStorageService) : base(httpclient, localStorageService)
         {
             this._localStorageService = localStorageService;
             this._mapper = mapper;
-            this._httpclient = httpclient;
         }
 
         public async Task<Response<int>> CreateLeaveType(CreateLeaveTypeVM leaveType)
