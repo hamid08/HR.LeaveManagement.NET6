@@ -10,9 +10,14 @@ namespace HR.LeaveManagement.Api.Controllers
     public class AccountController : ControllerBase
     {
         private readonly IAuthService _authenticationService;
-        public AccountController(IAuthService authenticationService)
+        private readonly IjwtService _jwtService;
+        private readonly IUserService _userService;
+
+        public AccountController(IAuthService authenticationService,IjwtService jwtService,IUserService userService)
         {
             _authenticationService = authenticationService;
+            _jwtService = jwtService;
+            _userService = userService;
         }
 
         [HttpPost("login")]
@@ -25,6 +30,19 @@ namespace HR.LeaveManagement.Api.Controllers
         public async Task<ActionResult<RegistrationResponse>> Register(RegistrationRequest request)
         {
             return Ok(await _authenticationService.Register(request));
+        }
+
+        [HttpPost]
+        [Route("refresh")]
+        public IActionResult Refresh(Tokens token)
+        {
+            var newJwtToken = _authenticationService.Refresh(token);
+            if(newJwtToken != null)
+            {
+                return Ok(newJwtToken);
+            }
+            return Unauthorized("Invalid attempt!");
+
         }
     }
 }

@@ -2,9 +2,11 @@
 using HR.LeaveManagement.Application.Contracts.Identity;
 using HR.LeaveManagement.Application.Models.Identity;
 using HR.LeaveManagement.Identity.Models;
+using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
@@ -19,44 +21,74 @@ namespace HR.LeaveManagement.Identity.Services
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly JwtSettings _jwtSettings;
+        private readonly IjwtService _jwtService;
+        private readonly IUserService _userService;
+
 
         public AuthService(UserManager<ApplicationUser> userManager,
-            IOptions<JwtSettings> jwtSettings,
-            SignInManager<ApplicationUser> signInManager)
+            SignInManager<ApplicationUser> signInManager,
+            IjwtService jwtService,
+            IUserService userService)
         {
             _userManager = userManager;
-            _jwtSettings = jwtSettings.Value;
             _signInManager = signInManager;
+            _jwtService = jwtService;
+            _userService = userService;
+
         }
 
         public async Task<AuthResponse> Login(AuthRequest request)
         {
-            var user = await _userManager.FindByEmailAsync(request.Email);
-
-            if (user == null)
+            try
             {
-                throw new Exception($"User with {request.Email} not found.");
+                var user = await _userManager.FindByEmailAsync(request.Email);
+
+                if (user == null)
+                {
+                    throw new Exception($"User with {request.Email} not found.");
+                }
+
+                var result = await _signInManager.PasswordSignInAsync(user.UserName, request.Password, false, lockoutOnFailure: false);
+
+                if (!result.Succeeded)
+                {
+                    throw new Exception($"Credentials for '{request.Email} aren't valid'.");
+                }
+
+                var token = _jwtService.GenerateToken(await GetClaimsAsync(user));
+
+
+                if (token == null)
+                {
+                    throw new Exception("Invalid Attempt!");
+                }
+
+                // saving refresh token to the db
+                UserRefreshToken obj = new UserRefreshToken
+                {
+                    RefreshToken = token.Refresh_Token,
+                    UserId = user.Id
+                };
+
+                await _userService.AddUserRefreshTokens(obj);
+                await _userService.SaveCommit();
+
+                AuthResponse response = new AuthResponse
+                {
+                    Id = user.Id,
+                    Token = _jwtService.GenerateToken(await GetClaimsAsync(user)),
+                    Email = user.Email,
+                    UserName = user.UserName
+                };
+
+                return response;
             }
-
-            var result = await _signInManager.PasswordSignInAsync(user.UserName, request.Password, false, lockoutOnFailure: false);
-
-            if (!result.Succeeded)
+            catch (Exception ex)
             {
-                throw new Exception($"Credentials for '{request.Email} aren't valid'.");
+
+                throw new Exception(ex.Message);
+
             }
-
-            JwtSecurityToken jwtSecurityToken = await GenerateToken(user);
-
-            AuthResponse response = new AuthResponse
-            {
-                Id = user.Id,
-                Token = new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken),
-                Email = user.Email,
-                UserName = user.UserName
-            };
-
-            return response;
         }
 
         public async Task<RegistrationResponse> Register(RegistrationRequest request)
@@ -99,7 +131,7 @@ namespace HR.LeaveManagement.Identity.Services
             }
         }
 
-        private async Task<JwtSecurityToken> GenerateToken(ApplicationUser user)
+        private async Task<IEnumerable<Claim>> GetClaimsAsync(ApplicationUser user)
         {
             var userClaims = await _userManager.GetClaimsAsync(user);
             var roles = await _userManager.GetRolesAsync(user);
@@ -121,16 +153,46 @@ namespace HR.LeaveManagement.Identity.Services
             .Union(userClaims)
             .Union(roleClaims);
 
-            var symmetricSecurityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Key));
-            var signingCredentials = new SigningCredentials(symmetricSecurityKey, SecurityAlgorithms.HmacSha256);
-
-            var jwtSecurityToken = new JwtSecurityToken(
-                issuer: _jwtSettings.Issuer,
-                audience: _jwtSettings.Audience,
-                claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(_jwtSettings.DurationInMinutes),
-                signingCredentials: signingCredentials);
-            return jwtSecurityToken;
+            return claims;
         }
+
+        public async Task<Tokens> Refresh(Tokens token)
+        {
+            var principal = _jwtService.GetPrincipalFromExpiredToken(token.Access_Token);
+            var userId = principal.Identities.First().Claims.FirstOrDefault(x =>
+            x.Type == CustomClaimTypes.Uid)?.Value;
+
+            //retrieve the saved refresh token from database
+            var savedRefreshToken = await _userService.GetSavedRefreshTokens(userId, token.Refresh_Token);
+
+            if (savedRefreshToken.RefreshToken != token.Refresh_Token)
+            {
+                return null;
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+
+            var newJwtToken = _jwtService.GenerateRefreshToken(await GetClaimsAsync(user));
+
+            if (newJwtToken == null)
+            {
+                return null;
+            }
+
+            // saving refresh token to the db
+            UserRefreshToken obj = new UserRefreshToken
+            {
+                RefreshToken = newJwtToken.Refresh_Token,
+                UserId = userId
+            };
+
+           await _userService.DeleteUserRefreshTokens(userId, token.Refresh_Token);
+           await _userService.AddUserRefreshTokens(obj);
+            _userService.SaveCommit();
+
+            return newJwtToken;
+        }
+
+
     }
 }

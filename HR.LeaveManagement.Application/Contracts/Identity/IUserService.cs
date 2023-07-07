@@ -11,5 +11,13 @@ namespace HR.LeaveManagement.Application.Contracts.Identity
     {
         Task<List<Employee>> GetEmployees();
         Task<Employee> GetEmployee(string userId);
+
+        Task<UserRefreshToken> AddUserRefreshTokens(UserRefreshToken user);
+
+        Task<UserRefreshToken> GetSavedRefreshTokens(string userId, string refreshtoken);
+
+        Task DeleteUserRefreshTokens(string userId, string refreshToken);
+
+        Task SaveCommit();
     }
 }

@@ -19,11 +19,20 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 .AddCookie(options =>
 {
     options.LoginPath = new PathString("/users/login");
+    options.LogoutPath = new PathString("/users/logOut");
+    options.AccessDeniedPath = new PathString("/users/accessDenied");
+
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(int.Parse(builder.Configuration["AuthConfig:IdentityExpireTimeSpan"]));
+    options.SlidingExpiration = true;
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.Name = "HR_Management";
+    options.ReturnUrlParameter = CookieAuthenticationDefaults.ReturnUrlParameter;
 });
 
 builder.Services.AddTransient<IAuthenticationService, AuthenticationService>();
 
-builder.Services.AddHttpClient<IHRClient, HRClient>(cl => cl.BaseAddress = new Uri("https://localhost:7273"));
+builder.Services.AddHttpClient<IHRClient, HRClient>(cl => cl.BaseAddress = new Uri(builder.Configuration["Api:BaseAddress"]));
 builder.Services.AddAutoMapper(Assembly.GetExecutingAssembly());
 
 builder.Services.AddScoped<ILeaveTypeService, LeaveTypeService>();
